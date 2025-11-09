@@ -1,13 +1,12 @@
 import requests
 import json
 import logging
-import os
+import time
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 # Bot configuration
-BOT_TOKEN = os.environ.get('BOT_TOKEN', "8229579729:AAHl6evGAUA96K-94SRnHVlMvj7QaEZPblM")
-ADLINKFLY_API_BASE = "https://anyshorturl.com/api"
+BOT_TOKEN = "8229579729:AAHl6evGAUA96K-94SRnHVlMvj7QaEZPblM"
 
 # Enable logging
 logging.basicConfig(
@@ -18,16 +17,15 @@ logger = logging.getLogger(__name__)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = """
-🤖 URL Shortener Bot - Render
+🤖 URL Shortener Bot
 
 I can shorten URLs using your AdLinkFly website!
-Running 24/7 on Render.com
 
-**How to use:**
+How to use:
 1. First set your API key using /setapi command
 2. Then send me any URL to shorten
 
-**Commands:**
+Commands:
 /setapi <your_api_key> - Set your API key
 /help - Show help guide
     """
@@ -57,9 +55,16 @@ async def shorten_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         processing_msg = await update.message.reply_text("⏳ Processing your URL...")
         
-        # API call
-        api_url = f"{ADLINKFLY_API_BASE}?api={api_key}&url={requests.utils.quote(url)}"
-        response = requests.get(api_url, timeout=30)
+        # PythonAnywhere compatible API call
+        api_url = f"http://anyshorturl.com/api?api={api_key}&url={requests.utils.quote(url)}"
+        
+        # Try HTTP first (PythonAnywhere allows some HTTP sites)
+        try:
+            response = requests.get(api_url, timeout=10)
+        except:
+            # If HTTP fails, try different approach
+            api_url = f"https://anyshorturl.com/api?api={api_key}&url={requests.utils.quote(url)}"
+            response = requests.get(api_url, timeout=10)
         
         if response.status_code == 200:
             data = response.json()
@@ -80,30 +85,27 @@ async def shorten_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(f"❌ API Error: {data.get('message', 'Unknown error')}")
         else:
             await processing_msg.delete()
-            await update.message.reply_text(f"❌ Server Error: Status code {response.status_code}")
+            await update.message.reply_text("❌ Error: Cannot connect to shortener service from PythonAnywhere")
             
     except Exception as e:
         await processing_msg.delete()
-        await update.message.reply_text(f"❌ Error: {str(e)}")
+        await update.message.reply_text(f"❌ PythonAnywhere Network Error: External HTTPS calls are blocked")
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = """
-🆘 **Help Guide - Render**
+🆘 Help Guide
 
-**How to get API Key:**
+How to get API Key:
 1. Login to anyshorturl.com
 2. Go to API section in Dashboard
 3. Copy your API key
 
-**Commands:**
+Commands:
 /start - Start the bot
 /setapi <api_key> - Set your API key
 /help - Show help message
 
-**How to use:**
-1. Set API key using /setapi command
-2. Send any URL to shorten
-3. Copy the shortened URL
+Note: PythonAnywhere may block some external URLs
     """
     await update.message.reply_text(help_text)
 
@@ -116,8 +118,8 @@ def main():
         application.add_handler(CommandHandler("help", help_command))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, shorten_url))
 
-        logger.info("🤖 Bot starting on Render...")
-        print("🚀 Bot is running 24/7 on Render...")
+        logger.info("🤖 Bot starting on PythonAnywhere...")
+        print("🤖 Bot is running on PythonAnywhere...")
         
         application.run_polling()
     except Exception as e:
